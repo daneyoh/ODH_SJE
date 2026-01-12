@@ -1,10 +1,10 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { InvitationData, TemplateId, GalleryImage } from './types';
 import TemplateSelector from './components/TemplateSelector';
 import Preview from './components/Preview';
 import { generateInvitationMessage } from './services/geminiService';
-import { Sparkles, Heart, Music, Car, Plus, Info, Map as MapIcon } from 'lucide-react';
+import { Sparkles, Heart, Music, Car, Plus, Info, Map as MapIcon, Image as ImageIcon, RotateCcw, Share2, Check } from 'lucide-react';
 
 const App: React.FC = () => {
   const [data, setData] = useState<InvitationData>({
@@ -27,7 +27,7 @@ const App: React.FC = () => {
       { id: '3', url: 'https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&q=80&w=800' }
     ],
     locationImages: [
-      { id: 'default-map', url: '/location_map.jpg' }
+      { id: 'default-map', url: '/location_map.jpg' } 
     ],
     accounts: {
       groom: [
@@ -44,8 +44,26 @@ const App: React.FC = () => {
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
+  const [showCopyAlert, setShowCopyAlert] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const mapInputRef = useRef<HTMLInputElement>(null);
+
+  // URL에서 데이터를 복원하는 로직
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const encodedData = params.get('invitation');
+    if (encodedData) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(encodedData)));
+        setData(decoded);
+        setIsViewMode(true);
+      } catch (e) {
+        console.error("Failed to decode invitation data", e);
+      }
+    }
+  }, []);
 
   const handleChange = (field: string, value: any) => {
     setData(prev => {
@@ -73,15 +91,36 @@ const App: React.FC = () => {
     setIsGenerating(false);
   };
 
+  const handlePublish = () => {
+    // 데이터를 Base64로 인코딩하여 URL 생성
+    const jsonStr = JSON.stringify(data);
+    const encoded = btoa(encodeURIComponent(jsonStr));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?invitation=${encoded}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setShowCopyAlert(true);
+      setTimeout(() => setShowCopyAlert(false), 3000);
+    });
+  };
+
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>, targetField: 'images' | 'locationImages') => {
     const files = e.target.files;
-    if (files) {
+    if (files && files[0]) {
       const newImages: GalleryImage[] = Array.from(files).map((file: File) => ({
         id: Math.random().toString(36).substr(2, 9),
         url: URL.createObjectURL(file)
       }));
-      handleChange(targetField, [...(data[targetField] as GalleryImage[]), ...newImages]);
+      
+      if (targetField === 'locationImages') {
+        handleChange(targetField, [newImages[0]]);
+      } else {
+        handleChange(targetField, [...(data[targetField] as GalleryImage[]), ...newImages]);
+      }
     }
+  };
+
+  const resetToDefaultMap = () => {
+    handleChange('locationImages', [{ id: 'default-map', url: '/location_map.jpg' }]);
   };
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,15 +149,44 @@ const App: React.FC = () => {
 
   const onDragEnd = () => setDraggedIndex(null);
 
+  // 보기 모드일 때는 에디터 없이 프리뷰만 꽉 차게 렌더링
+  if (isViewMode) {
+    return (
+      <div className="fixed inset-0 bg-[#f8f9fa] flex items-center justify-center overflow-hidden">
+        <div className="w-full h-full max-w-none max-h-none sm:max-w-[375px] sm:max-h-[812px] sm:shadow-2xl sm:rounded-[3rem] sm:border-[12px] sm:border-[#1a1a1a] relative bg-white overflow-hidden">
+           <Preview data={data} isStandalone={true} />
+        </div>
+        <button 
+          onClick={() => {
+            window.history.replaceState({}, '', window.location.pathname);
+            setIsViewMode(false);
+          }}
+          className="fixed bottom-6 right-6 bg-zinc-900 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-2xl z-[100] opacity-20 hover:opacity-100 transition-opacity"
+        >
+          <RotateCcw size={20} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#f0f2f5]">
+      {/* EDITOR SIDE */}
       <div className="flex-1 lg:max-w-xl bg-white h-screen p-6 lg:p-10 border-r border-zinc-200 overflow-y-auto no-scrollbar shadow-xl z-20">
-        <header className="mb-12 flex items-center justify-between">
+        <header className="mb-12 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md py-4 z-30">
           <div className="flex items-center gap-3 text-rose-500">
             <Heart fill="currentColor" size={28} />
             <h1 className="text-2xl font-black tracking-tighter text-zinc-900">Everlasting</h1>
           </div>
-          <div className="bg-zinc-100 px-3 py-1 rounded-full text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Editor</div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handlePublish}
+              className="bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-rose-200 transition-all active:scale-95"
+            >
+              {showCopyAlert ? <Check size={18} /> : <Share2 size={18} />}
+              {showCopyAlert ? '링크 복사됨!' : '배포하기'}
+            </button>
+          </div>
         </header>
 
         <main className="space-y-12 pb-32">
@@ -153,22 +221,25 @@ const App: React.FC = () => {
             <input type="text" placeholder="도로명 주소" value={data.address} onChange={(e) => handleChange('address', e.target.value)} className="input-field w-full" />
           </section>
 
-          {/* Location Gallery (Fixed Map - Task 2) */}
+          {/* Location Map Image */}
           <section className="space-y-6">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] block">Location Map (Fixed)</label>
-            <div className="rounded-2xl overflow-hidden border border-zinc-200 relative group bg-zinc-50 shadow-sm aspect-video">
-              <img src={data.locationImages[0].url} className="w-full h-full object-cover" alt="fixed-location-map" />
-              <div className="absolute top-3 left-3 bg-zinc-900/80 backdrop-blur-sm text-white text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                <MapIcon size={12} /> Read-Only
-              </div>
+            <div className="flex justify-between items-end">
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] block">Location Map Image</label>
+              <button onClick={resetToDefaultMap} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 flex items-center gap-1.5 transition-colors">
+                <RotateCcw size={12} /> 기본 지도로 복구
+              </button>
             </div>
-            <div className="flex items-start gap-2 text-zinc-400 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
-              <Info size={14} className="mt-0.5" />
-              <p className="text-[11px] leading-relaxed">지도 이미지는 <b>/location_map.jpg</b>로 고정되어 수정할 수 없습니다. 하객들에게 일관된 약도 정보를 제공합니다.</p>
+            <div onClick={() => mapInputRef.current?.click()} className="rounded-2xl overflow-hidden border-2 border-dashed border-zinc-200 relative group bg-zinc-50 shadow-sm aspect-video cursor-pointer hover:border-rose-300 transition-all">
+              <img src={data.locationImages[0]?.url} className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" alt="location-map" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 text-white backdrop-blur-[2px]">
+                <ImageIcon size={32} className="mb-2" />
+                <span className="text-xs font-bold">지도 이미지 교체하기</span>
+              </div>
+              <input type="file" ref={mapInputRef} className="hidden" accept="image/*" onChange={(e) => handleGalleryUpload(e, 'locationImages')} />
             </div>
           </section>
 
-          {/* Message */}
+          {/* Greeting */}
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">Greeting</label>
@@ -179,27 +250,18 @@ const App: React.FC = () => {
             <textarea rows={5} value={data.welcomeMessage} onChange={(e) => handleChange('welcomeMessage', e.target.value)} className="input-field w-full resize-none leading-relaxed" />
           </section>
 
-          {/* Main Gallery */}
+          {/* Photo Gallery */}
           <section className="space-y-6">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] block">Photo Gallery (Drag to Reorder)</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] block">Photo Gallery</label>
             <div className="grid grid-cols-4 gap-3">
               <label className="aspect-square border-2 border-dashed border-zinc-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors group">
                 <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => handleGalleryUpload(e, 'images')} />
                 <Plus size={24} className="text-zinc-300 group-hover:text-zinc-500" />
               </label>
               {data.images.map((img, index) => (
-                <div 
-                  key={img.id} 
-                  draggable
-                  onDragStart={(e) => onDragStart(e, index)}
-                  onDragOver={(e) => onDragOver(e, index)}
-                  onDragEnd={onDragEnd}
-                  className={`aspect-square rounded-2xl overflow-hidden border border-zinc-100 relative group cursor-move transition-all ${draggedIndex === index ? 'opacity-30 scale-90 ring-4 ring-rose-200' : 'hover:shadow-lg'}`}
-                >
+                <div key={img.id} draggable onDragStart={(e) => onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)} onDragEnd={onDragEnd} className={`aspect-square rounded-2xl overflow-hidden border border-zinc-100 relative group cursor-move transition-all ${draggedIndex === index ? 'opacity-30 scale-90 ring-4 ring-rose-200' : 'hover:shadow-lg'}`}>
                   <img src={img.url} className="w-full h-full object-cover pointer-events-none" alt="item" />
-                  {index === 0 && (
-                    <div className="absolute top-1 left-1 bg-zinc-900 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Main</div>
-                  )}
+                  {index === 0 && <div className="absolute top-1 left-1 bg-zinc-900 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Main</div>}
                   <button onClick={() => handleChange('images', data.images.filter(i => i.id !== img.id))} className="absolute top-1 right-1 w-6 h-6 bg-rose-500 rounded-full text-white shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="text-[12px] font-bold">×</span>
                   </button>
@@ -208,7 +270,7 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          {/* Music Upload */}
+          {/* Background Music */}
           <section className="space-y-6">
             <label className="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] block">Background Music</label>
             <div className="p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between">
@@ -219,23 +281,12 @@ const App: React.FC = () => {
                   <p className="text-[11px] text-zinc-400 mt-0.5">{data.audioUrl ? '음악이 등록되었습니다.' : '파일을 선택하세요.'}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => audioInputRef.current?.click()}
-                className="text-[11px] font-bold bg-white border border-zinc-200 px-4 py-2 rounded-lg hover:shadow-md transition-shadow"
-              >
-                파일 선택
-              </button>
-              <input 
-                type="file" 
-                ref={audioInputRef} 
-                className="hidden" 
-                accept="audio/*" 
-                onChange={handleAudioUpload} 
-              />
+              <button onClick={() => audioInputRef.current?.click()} className="text-[11px] font-bold bg-white border border-zinc-200 px-4 py-2 rounded-lg hover:shadow-md transition-shadow">파일 선택</button>
+              <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioUpload} />
             </div>
           </section>
 
-          {/* Parking Guide Toggle */}
+          {/* Traffic/Parking Toggle */}
           <section className="space-y-5">
             <div className="flex items-center justify-between p-6 border border-zinc-100 rounded-2xl bg-zinc-50/50">
                <div className="flex items-center gap-4">
@@ -245,10 +296,7 @@ const App: React.FC = () => {
                    <p className="text-[11px] text-zinc-400 mt-0.5">안내 영상 및 상세 주차 정보를 하단에 표시합니다.</p>
                  </div>
                </div>
-               <div 
-                 onClick={() => handleChange('parkingGuideEnabled', !data.parkingGuideEnabled)}
-                 className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${data.parkingGuideEnabled ? 'bg-rose-500' : 'bg-zinc-200'}`}
-               >
+               <div onClick={() => handleChange('parkingGuideEnabled', !data.parkingGuideEnabled)} className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${data.parkingGuideEnabled ? 'bg-rose-500' : 'bg-zinc-200'}`}>
                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${data.parkingGuideEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                </div>
             </div>
@@ -256,6 +304,7 @@ const App: React.FC = () => {
         </main>
       </div>
 
+      {/* PREVIEW SIDE */}
       <div className="flex-1 bg-[#d0d3d9] flex items-center justify-center p-6 lg:p-12 overflow-hidden h-screen">
         <Preview data={data} />
       </div>

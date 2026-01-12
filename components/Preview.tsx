@@ -25,6 +25,7 @@ import {
 
 interface Props {
   data: InvitationData;
+  isStandalone?: boolean;
 }
 
 const PetalEffect: React.FC = () => {
@@ -58,7 +59,7 @@ const PetalEffect: React.FC = () => {
   );
 };
 
-const Preview: React.FC<Props> = ({ data }) => {
+const Preview: React.FC<Props> = ({ data, isStandalone = false }) => {
   const [mapLinks, setMapLinks] = useState<GroundingLink[]>([]);
   const [loadingMap, setLoadingMap] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -113,7 +114,7 @@ const Preview: React.FC<Props> = ({ data }) => {
   const currentLightboxImages = lightboxState?.type === 'main' ? data.images : data.locationImages;
 
   return (
-    <div className="w-full max-w-[375px] h-full max-h-[812px] mx-auto shadow-2xl rounded-[3rem] border-[12px] border-[#1a1a1a] relative bg-white overflow-hidden select-none">
+    <div className={`w-full mx-auto relative bg-white overflow-hidden select-none h-full ${isStandalone ? 'max-w-none rounded-none border-none' : 'max-w-[375px] h-full max-h-[812px] shadow-2xl rounded-[3rem] border-[12px] border-[#1a1a1a]'}`}>
       
       {/* PERSISTENT AUDIO CONTROLLER */}
       {data.audioUrl && (
@@ -205,7 +206,7 @@ const Preview: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
-        {/* Location Section - Adjusted Padding (Requirement 1) */}
+        {/* Location Section */}
         <section className="pt-24 pb-8 px-8 bg-white text-center">
           <h2 className="playfair text-3xl font-light tracking-[0.2em] mb-12 text-stone-400 uppercase">Location</h2>
           
@@ -217,48 +218,26 @@ const Preview: React.FC<Props> = ({ data }) => {
 
           {/* Location Gallery Display */}
           <div className="space-y-4 mb-12">
-            {data.locationImages.length > 0 ? (
-              <div className="w-full">
-                {/* Primary Large Map View */}
-                <div 
-                  className="w-full h-auto bg-stone-50 rounded-2xl overflow-hidden relative border border-stone-200 shadow-xl cursor-zoom-in group active:scale-[0.98] transition-all"
-                  onClick={() => setLightboxState({ index: 0, type: 'location' })}
-                >
-                  <img 
-                    src={data.locationImages[0].url} 
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1543165365-07232ed12fad?auto=format&fit=crop&q=80&w=1200";
-                    }}
-                    className="w-full h-auto object-cover opacity-95 group-hover:scale-105 transition-transform duration-1000" 
-                    alt="Location Map"
-                  />
-                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="bg-white/90 px-4 py-2 rounded-full shadow-xl text-xs font-bold text-zinc-900 flex items-center gap-2">
-                      <MapPin size={14} /> 확대해서 보기
-                    </div>
+            <div className="w-full">
+              <div 
+                className="w-full h-auto bg-stone-50 rounded-2xl overflow-hidden relative border border-stone-200 shadow-xl cursor-zoom-in group active:scale-[0.98] transition-all"
+                onClick={() => setLightboxState({ index: 0, type: 'location' })}
+              >
+                <img 
+                  src={data.locationImages[0]?.url} 
+                  className="w-full h-auto min-h-[200px] object-cover opacity-95 group-hover:scale-105 transition-transform duration-1000" 
+                  alt="Location Map"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/800x450?text=Location+Map';
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="bg-white/90 px-4 py-2 rounded-full shadow-xl text-xs font-bold text-zinc-900 flex items-center gap-2">
+                    <MapPin size={14} /> 확대해서 보기
                   </div>
                 </div>
-
-                {/* Smaller Thumbnails if multiple images exist */}
-                {data.locationImages.length > 1 && (
-                  <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar py-2">
-                    {data.locationImages.slice(1).map((img, idx) => (
-                      <div 
-                        key={img.id}
-                        onClick={() => setLightboxState({ index: idx + 1, type: 'location' })}
-                        className="flex-shrink-0 w-24 h-24 rounded-xl border border-stone-100 overflow-hidden cursor-pointer hover:brightness-90 transition-all"
-                      >
-                        <img src={img.url} className="w-full h-full object-cover" alt="directions" />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="p-12 bg-zinc-50 rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-300 text-xs">
-                지도 이미지가 등록되지 않았습니다.
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Navigation Link Icons */}
@@ -309,7 +288,7 @@ const Preview: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
-        {/* Gift Section - Adjusted Padding (Requirement 2) */}
+        {/* Gift Section */}
         <section className="py-12 px-10 bg-zinc-50">
           <div className="text-[11px] tracking-[0.4em] mb-12 text-center uppercase font-black text-stone-300">Gift</div>
           <div className="space-y-3">
@@ -343,16 +322,31 @@ const Preview: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
-        {/* Share Section - Adjusted Padding (Requirement 3) */}
-        <section className="pt-8 pb-32 px-10 text-center">
-          <button className="w-full py-5 bg-[#FAE100] text-zinc-800 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-md hover:brightness-95 transition-all">
-            <Share2 size={18} /> 카카오톡으로 청첩장 공유
-          </button>
-          <div className="mt-20 opacity-5 flex flex-col items-center gap-2">
-            <Heart size={16} />
-            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Forever starts here</p>
-          </div>
-        </section>
+        {/* Share Section (Public only) */}
+        {isStandalone && (
+          <section className="pt-8 pb-32 px-10 text-center">
+            <button 
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: `${data.groomName} ♡ ${data.brideName} 결혼식에 초대합니다`,
+                    text: `${data.date} | ${data.location}`,
+                    url: window.location.href
+                  });
+                } else {
+                  copyToClipboard(window.location.href);
+                }
+              }}
+              className="w-full py-5 bg-[#FAE100] text-zinc-800 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-md hover:brightness-95 transition-all"
+            >
+              <Share2 size={18} /> 카카오톡으로 청첩장 공유
+            </button>
+            <div className="mt-20 opacity-5 flex flex-col items-center gap-2">
+              <Heart size={16} />
+              <p className="text-[10px] font-black uppercase tracking-[0.4em]">Forever starts here</p>
+            </div>
+          </section>
+        )}
 
         <div className="h-20" />
       </div>
