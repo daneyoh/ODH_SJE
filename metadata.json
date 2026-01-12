@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of Everlasting Love: Mobile Invitation Builder",
+  "description": "A high-end, responsive mobile wedding invitation builder featuring AI-powered text generation and interactive previews.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
